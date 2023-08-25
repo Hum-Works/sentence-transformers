@@ -44,7 +44,9 @@ class SentenceTransformer(nn.Sequential):
                  modules: Optional[Iterable[nn.Module]] = None,
                  device: Optional[str] = None,
                  cache_folder: Optional[str] = None,
-                 use_auth_token: Union[bool, str, None] = None
+                 use_auth_token: Union[bool, str, None] = None,
+                 trust_remote_code: bool = False,
+                 revision: Optional[str] = None
                  ):
         self._model_card_vars = {}
         self._model_card_text = None
@@ -92,9 +94,9 @@ class SentenceTransformer(nn.Sequential):
                                         use_auth_token=use_auth_token)
 
             if os.path.exists(os.path.join(model_path, 'modules.json')):    #Load as SentenceTransformer model
-                modules = self._load_sbert_model(model_path)
+                modules = self._load_sbert_model(model_path, trust_remote_code=trust_remote_code, revision=revision)
             else:   #Load with AutoModel
-                modules = self._load_auto_model(model_path)
+                modules = self._load_auto_model(model_path, trust_remote_code=trust_remote_code, revision=revision)
 
         if modules is not None and not isinstance(modules, OrderedDict):
             modules = OrderedDict([(str(idx), module) for idx, module in enumerate(modules)])
@@ -800,16 +802,16 @@ class SentenceTransformer(nn.Sequential):
                 shutil.rmtree(old_checkpoints[0]['path'])
 
 
-    def _load_auto_model(self, model_name_or_path):
+    def _load_auto_model(self, model_name_or_path, trust_remote_code=False, revision=None):
         """
         Creates a simple Transformer + Mean Pooling model and returns the modules
         """
         logger.warning("No sentence-transformers model found with name {}. Creating a new one with MEAN pooling.".format(model_name_or_path))
-        transformer_model = Transformer(model_name_or_path)
+        transformer_model = Transformer(model_name_or_path, trust_remote_code=trust_remote_code, revision=revision)
         pooling_model = Pooling(transformer_model.get_word_embedding_dimension(), 'mean')
         return [transformer_model, pooling_model]
 
-    def _load_sbert_model(self, model_path):
+    def _load_sbert_model(self, model_path, trust_remote_code=False, revision=None):
         """
         Loads a full sentence-transformers model
         """
@@ -839,7 +841,10 @@ class SentenceTransformer(nn.Sequential):
         modules = OrderedDict()
         for module_config in modules_config:
             module_class = import_from_string(module_config['type'])
-            module = module_class.load(os.path.join(model_path, module_config['path']))
+            if module_config['type'] == 'sentence_transformers.models.Transformer':
+                module = module_class.load(os.path.join(model_path, module_config['path']), trust_remote_code=trust_remote_code, revision=revision)
+            else:
+                module = module_class.load(os.path.join(model_path, module_config['path']))
             modules[module_config['name']] = module
 
         return modules

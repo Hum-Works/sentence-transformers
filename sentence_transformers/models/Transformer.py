@@ -20,13 +20,15 @@ class Transformer(nn.Module):
     def __init__(self, model_name_or_path: str, max_seq_length: Optional[int] = None,
                  model_args: Dict = {}, cache_dir: Optional[str] = None,
                  tokenizer_args: Dict = {}, do_lower_case: bool = False,
-                 tokenizer_name_or_path : str = None):
+                 tokenizer_name_or_path : str = None,
+                 trust_remote_code: bool = False,
+                 revision: Optional[str] = None):
         super(Transformer, self).__init__()
         self.config_keys = ['max_seq_length', 'do_lower_case']
         self.do_lower_case = do_lower_case
 
-        config = AutoConfig.from_pretrained(model_name_or_path, **model_args, cache_dir=cache_dir)
-        self._load_model(model_name_or_path, config, cache_dir, **model_args)
+        config = AutoConfig.from_pretrained(model_name_or_path, **model_args, cache_dir=cache_dir, trust_remote_code=trust_remote_code, revision=revision)
+        self._load_model(model_name_or_path, config, cache_dir, **model_args, trust_remote_code=trust_remote_code, revision=revision)
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path if tokenizer_name_or_path is not None else model_name_or_path, cache_dir=cache_dir, **tokenizer_args)
 
@@ -41,14 +43,14 @@ class Transformer(nn.Module):
             self.auto_model.config.tokenizer_class = self.tokenizer.__class__.__name__
 
 
-    def _load_model(self, model_name_or_path, config, cache_dir, **model_args):
+    def _load_model(self, model_name_or_path, config, cache_dir, trust_remote_code=False, revision=None, **model_args):
         """Loads the transformer model"""
         if isinstance(config, T5Config):
             self._load_t5_model(model_name_or_path, config, cache_dir, **model_args)
         elif isinstance(config, MT5Config):
             self._load_mt5_model(model_name_or_path, config, cache_dir, **model_args)
         else:
-            self.auto_model = AutoModel.from_pretrained(model_name_or_path, config=config, cache_dir=cache_dir, **model_args)
+            self.auto_model = AutoModel.from_pretrained(model_name_or_path, config=config, cache_dir=cache_dir, **model_args, trust_remote_code=trust_remote_code, revision=revision)
 
     def _load_t5_model(self, model_name_or_path, config, cache_dir, **model_args):
         """Loads the encoder model from T5"""
@@ -133,7 +135,7 @@ class Transformer(nn.Module):
             json.dump(self.get_config_dict(), fOut, indent=2)
 
     @staticmethod
-    def load(input_path: str):
+    def load(input_path: str, trust_remote_code: bool = False, revision: Optional[str] = None):
         #Old classes used other config names than 'sentence_bert_config.json'
         for config_name in ['sentence_bert_config.json', 'sentence_roberta_config.json', 'sentence_distilbert_config.json', 'sentence_camembert_config.json', 'sentence_albert_config.json', 'sentence_xlm-roberta_config.json', 'sentence_xlnet_config.json']:
             sbert_config_path = os.path.join(input_path, config_name)
@@ -142,7 +144,7 @@ class Transformer(nn.Module):
 
         with open(sbert_config_path) as fIn:
             config = json.load(fIn)
-        return Transformer(model_name_or_path=input_path, **config)
+        return Transformer(model_name_or_path=input_path, trust_remote_code=trust_remote_code, revision=revision, **config)
 
 
 
