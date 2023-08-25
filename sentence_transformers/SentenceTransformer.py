@@ -87,6 +87,7 @@ class SentenceTransformer(nn.Sequential):
                 if not os.path.exists(os.path.join(model_path, 'modules.json')):
                     # Download from hub with caching
                     snapshot_download(model_name_or_path,
+                                      revision=revision,
                                         cache_dir=cache_folder,
                                         library_name='sentence-transformers',
                                         library_version=__version__,
@@ -850,8 +851,8 @@ class SentenceTransformer(nn.Sequential):
         return modules
 
     @staticmethod
-    def load(input_path):
-        return SentenceTransformer(input_path)
+    def load(input_path, trust_remote_code=False, revision=None):
+        return SentenceTransformer(input_path, trust_remote_code=trust_remote_code, revision=revision)
 
     @staticmethod
     def _get_scheduler(optimizer, scheduler: str, warmup_steps: int, t_total: int):
